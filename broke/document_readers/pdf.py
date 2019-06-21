@@ -17,7 +17,7 @@ class PDFReader(BaseDocumentReader):
         json_data = self.pdf_to_json()
         for table in json_data:
             for line in table['data']:
-                yield self.read_line(line)
+                self.read_line(line)
 
     def read_line(self, line):
-        return [cell['text'] for cell in line]
+        print([cell['text'] for cell in line])

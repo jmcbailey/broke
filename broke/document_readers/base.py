@@ -13,7 +13,3 @@ class BaseDocumentReader(ABC):
     @abstractmethod
     def read_line(self, line):
         pass
-
-    def extract(self):
-        for line in self.read():
-            self.document.add(line)

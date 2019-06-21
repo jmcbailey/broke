@@ -1,44 +1,48 @@
-from collections import namedtuple
 from enum import Enum
 
 
-class BaseDocument:
+class BankStatement:
     def __init__(self):
-        self.elements = []
+        self.pages = []
         self.current_page = None
 
-    def add(self, element):
-        self.elements.append(element)
-
-    def new_page(self):
+    def start_page(self):
         if self.current_page:
-            self.elements.append(self.current_page)
+            self.pages.append(self.current_page)
         self.current_page = Page()
 
-    def end_page(self):
+    def finish_page(self):
         if self.current_page:
             self.pages.append(self.current_page)
         self.current_page = None
 
 
-class BankStatement(BaseDocument):
-    def __pinit__(self):
-        self.account_info = {}
-
-    @property
-    def transactions(self):
-        return
+class Page:
+    def __init__(self):
+        self.transactions = []
 
 
-class TransactionDirection(Enum):
-    IN = 1
-    OUT = 2
+class TransactionType(Enum):
+    CREDIT = 'credit'
+    DEBIT = 'debit'
 
 
-Page = namedtuple('Page', ['transactions'], defaults=([]))
+class TransactionSubtype(Enum):
+    PURCHASE = 'purchase'
+    ATM_WITHDRAWAL = 'atm_withdrawal'
+    DIRECT_DEBIT = 'direct_debit'
+    STANDING_ORDER = 'standing_order'
+    BANK_TRANSFER = 'bank_transfer'
+    FOREIGN_EXCHANGE = 'foreign_exchange'
+    FEES ='fees'
+    INTEREST = 'interest'
 
 
-Transaction = namedtuple(
-    'Transaction',
-    ['direction', 'amount', 'description', 'tags']
-)
+
+class Transaction:
+    def __init__(self, tx_date, tx_type, amount, description, tags=None):
+        self.tx_date = tx_date
+        self.tx_type = tx_type
+        self.amount = amount
+        self.description = description
+        self.tags = tags or []
