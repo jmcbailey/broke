@@ -17,6 +17,7 @@ def main():
     doc = BankStatement()
     reader = BOIStatementReader(pdf_path, doc)
     reader.read()
+    return doc
 
 if __name__ == '__main__':
     main()

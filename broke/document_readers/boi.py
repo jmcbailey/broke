@@ -41,7 +41,7 @@ TX_DATE_REGEX_2 = (
 )
 
 TX_DATE_REGEX_3 = (
-    '[0123][0-9][0123][0-9]'
+    '[0123][0-9][01][0-9]'
 )
 
 AMOUNT_REGEX = '[0-9]{1,3}(,[0-9]{3})*\.[0-9]{2}'
@@ -186,7 +186,8 @@ class BOIStatementReader(PDFReader):
                 transaction.tags.append(tx_subtype._value_)
                 break
         if not match:
-            logger.debug('UNMATCHED TX: %s', transaction.__dict__)
+            logger.info('UNMATCHED TX: %s', transaction)
+            self.unmatched_transactions.append(transaction)
 
     def parse_amount(self, amount):
         return Decimal(amount.replace(',', ''))

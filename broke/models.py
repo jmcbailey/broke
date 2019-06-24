@@ -1,4 +1,5 @@
 from enum import Enum
+from itertools import chain
 
 
 class BankStatement:
@@ -15,6 +16,32 @@ class BankStatement:
         if self.current_page:
             self.pages.append(self.current_page)
         self.current_page = None
+
+    def add_transaction(self, transaction):
+        pass
+
+    @property
+    def transactions(self):
+        return list(chain.from_iterable([
+            page.transactions for page in self.pages
+        ]))
+
+    def _filter_transactions(self, fn):
+        return list(filter(fn, self.transactions))
+
+    @property
+    def credits(self):
+        return self._filter_transactions(
+            lambda tx: tx.tx_type == TransactionType.CREDIT
+        )
+
+    @property
+    def debits(self):
+        return self._filter_transactions(
+            lambda tx: tx.tx_type == TransactionType.DEBIT
+        )
+
+
 
 
 class Page:
@@ -34,9 +61,8 @@ class TransactionSubtype(Enum):
     STANDING_ORDER = 'standing_order'
     BANK_TRANSFER = 'bank_transfer'
     FOREIGN_EXCHANGE = 'foreign_exchange'
-    FEES ='fees'
+    FEES = 'fees'
     INTEREST = 'interest'
-
 
 
 class Transaction:
@@ -46,3 +72,24 @@ class Transaction:
         self.amount = amount
         self.description = description
         self.tags = tags or []
+
+    def _repr(self, fields=None):
+        dic = {}
+        for field in fields:
+            field_names = field.split('.')
+            item = getattr(self, field_names[0])
+            if isinstance(item, datetime.datetime):
+                item = item.strftime(DAY_TIME_FORMAT_NO_SEC)
+            elif isinstance(item, list) and len(field_names) > 1:
+                item = getattr(item[0], field_names[1])
+            elif isinstance(item, list) and item:
+                item = item[0]
+            elif isinstance(item, dict) and 'en' in item:
+                item = item['en']
+
+            dic[field] = item
+
+        return '<{}: {}>'.format(self.__class__.__name__, str(dic))
+
+    def __repr__(self):
+        return self._repr(['tx_date', 'tx_type', 'amount', 'description'])
