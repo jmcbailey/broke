@@ -1,3 +1,4 @@
+from datetime import date
 from enum import Enum
 from itertools import chain
 
@@ -78,8 +79,8 @@ class Transaction:
         for field in fields:
             field_names = field.split('.')
             item = getattr(self, field_names[0])
-            if isinstance(item, datetime.datetime):
-                item = item.strftime(DAY_TIME_FORMAT_NO_SEC)
+            if isinstance(item, date):
+                item = item.strftime('%Y-%m-%d')
             elif isinstance(item, list) and len(field_names) > 1:
                 item = getattr(item[0], field_names[1])
             elif isinstance(item, list) and item:
