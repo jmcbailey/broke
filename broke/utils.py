@@ -1,5 +1,6 @@
 import re
 
+from collections import namedtuple
 from datetime import datetime
 from decimal import Decimal
 
@@ -20,6 +21,9 @@ class DateParser:
         return datetime.strptime(value.strip(), self.fmt).date()
 
 
+PatternMatch = namedtuple('PatternMatch', ['match', 'match_dict'])
+
+
 class Pattern:
     def __init__(self, regex, processors=None):
         self.regex = re.compile(regex)
@@ -34,7 +38,7 @@ class Pattern:
             if key not in match_dict:
                 continue
             match_dict[key] = processor(match_dict[key])
-        return match_dict
+        return PatternMatch(match, match_dict)
 
 
 # Common patterns

@@ -65,6 +65,8 @@ class TransactionSubtype(Enum):
     FEES = 'fees'
     INTEREST = 'interest'
 
+    OTHER = 'other'
+
 
 class Transaction:
     def __init__(self, tx_date, tx_type, amount, description, tags=None):
@@ -73,6 +75,7 @@ class Transaction:
         self.amount = amount
         self.description = description
         self.tags = tags or []
+        self.details = {}
 
     def _repr(self, fields=None):
         dic = {}
@@ -84,13 +87,16 @@ class Transaction:
             elif isinstance(item, list) and len(field_names) > 1:
                 item = getattr(item[0], field_names[1])
             elif isinstance(item, list) and item:
-                item = item[0]
+                # item = item[0]
+                pass
             elif isinstance(item, dict) and 'en' in item:
                 item = item['en']
 
             dic[field] = item
 
-        return '<{}: {}>'.format(self.__class__.__name__, str(dic))
+        return '<{}: {}>'.format(self.__class__.__name__, list(dic.values()))
 
     def __repr__(self):
-        return self._repr(['tx_date', 'tx_type', 'amount', 'description'])
+        return self._repr([
+            'tx_date', 'tx_type', 'amount', 'description', 'tags', 'details'
+        ])

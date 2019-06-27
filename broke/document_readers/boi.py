@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 '''
 TODO:
 - check balance as each tx processed
-- Save custom tag rules as JSON and apply
+- Save custom tag rules as JSON and apply (?)
 - Reuse description pattern
 - Count grouped transaction counts and amounts as each tx is read
 '''
@@ -77,7 +77,7 @@ class BOIStatementReader(PDFReader):
 
     transaction_patterns = {
         TransactionSubtype.PURCHASE: Pattern(
-            r'^POSC?(?P<tx_date>%s) (?P<desc>[\d\w*@.&/\-\'+ ]{2,12})$' %
+            r'^POSC?(?P<tx_date>%s) (?P<merchant>[\d\w*@.&/\-\'+ ]{2,12})$' %
             TX_DATE_REGEX_2,
             processors={'tx_date': DateParser('%d%b')}
         ),
@@ -87,13 +87,13 @@ class BOIStatementReader(PDFReader):
             processors={'tx_date': DateParser('%d%b')}
         ),
         TransactionSubtype.DIRECT_DEBIT: Pattern(
-            r'^(?P<desc>[\d\w*@.&/\-\'+ ]{2,13}) ?SEPA DD$'
+            r'^(?P<dest>[\d\w*@.&/\-\'+ ]{2,13}) ?SEPA DD$'
         ),
         TransactionSubtype.STANDING_ORDER: Pattern(
             r'^TO A/C (?P<dest>\d{8})SO$'
         ),
         TransactionSubtype.BANK_TRANSFER: Pattern(
-            r'^365 Online ?(?P<desc>[\d\w*@.&/\-\'+ ]{2,10})$'
+            r'^365 Online ?(?P<dest>[\d\w*@.&/\-\'+ ]{2,10})$'
         ),
         TransactionSubtype.FOREIGN_EXCHANGE: Pattern(
             r'^[CAP](?P<tx_date>%s)[A-Z]{2} {0,2}(?:%s)@[0-9.]{7}$' % (
@@ -103,6 +103,7 @@ class BOIStatementReader(PDFReader):
         ),
         TransactionSubtype.FEES: Pattern(r'^NOTIFIED FEES$'),
         TransactionSubtype.INTEREST: Pattern(r'^INTEREST$'),
+        TransactionSubtype.OTHER: Pattern(r'.*'),  # catch-all
     }
 
     def __init__(self, *args, **kwargs):
@@ -150,7 +151,7 @@ class BOIStatementReader(PDFReader):
         elif line_type == StatementLineType.TRANSACTION:
             if not current_page:
                 logger.warning('Found unexpected transaction: %s', match)
-            self.process_transaction(match, line)
+            self.process_transaction(match.match_dict, line)
         elif current_page and line_type != StatementLineType.TRANSACTION:
             self.unmatched_transactions.append('|'.join(values))
 
@@ -169,26 +170,22 @@ class BOIStatementReader(PDFReader):
         transaction = Transaction(
             self.active_date, tx_type, tx_dict['amount'], tx_dict['desc']
         )
-        self.auto_tag(transaction)
-        logger.info('TX: %s', transaction.__dict__.values())
-        self.document.current_page.transactions.append(transaction)
-
-    def auto_tag(self, transaction):
-        match = None
         transaction.tags.append(transaction.tx_type._value_)
         for tx_subtype, pattern in self.transaction_patterns.items():
             match = pattern.match(transaction.description)
-            if match:
-                logger.debug('TX MATCH: %s: %s', tx_subtype._name_, match)
-                transaction.tags.append(tx_subtype._value_)
-                if match.get('tx_date'):
-                    # Use the date in the transaction description as it's
-                    # likely to be the actual transaction date
-                    transaction.tx_date = self.resolve_date(match['tx_date'])
-                break
-        if not match:
-            logger.info('UNMATCHED TX: %s', transaction)
-            self.unmatched_transactions.append(transaction)
+            if not match:
+                continue
+            match_dict = match.match_dict
+            tx_date = match_dict.pop('tx_date', None)
+            if tx_date:
+                # Use the date in the transaction description as it's
+                # likely to be the actual transaction date
+                transaction.tx_date = self.resolve_date(tx_date)
+            transaction.tags.append(tx_subtype._value_)
+            transaction.details = match_dict
+            break
+        logger.info('TX: %s', transaction)
+        self.document.current_page.transactions.append(transaction)
 
     def resolve_date(self, dt):
         assert self.active_date
