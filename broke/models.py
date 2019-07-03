@@ -1,53 +1,48 @@
+import logging
+
 from datetime import date
+from decimal import Decimal
 from enum import Enum
-from itertools import chain
+
+logger = logging.getLogger(__name__)
 
 
 class BankStatement:
     def __init__(self):
-        self.pages = []
-        self.current_page = None
-
-    def start_page(self):
-        if self.current_page:
-            self.pages.append(self.current_page)
-        self.current_page = Page()
-
-    def finish_page(self):
-        if self.current_page:
-            self.pages.append(self.current_page)
-        self.current_page = None
-
-    def add_transaction(self, transaction):
-        pass
-
-    @property
-    def transactions(self):
-        return list(chain.from_iterable([
-            page.transactions for page in self.pages
-        ]))
-
-    def _filter_transactions(self, fn):
-        return list(filter(fn, self.transactions))
-
-    @property
-    def credits(self):
-        return self._filter_transactions(
-            lambda tx: tx.tx_type == TransactionType.CREDIT
-        )
-
-    @property
-    def debits(self):
-        return self._filter_transactions(
-            lambda tx: tx.tx_type == TransactionType.DEBIT
-        )
-
-
-
-
-class Page:
-    def __init__(self):
+        self.active_page = False
+        self.page_count = 0
+        self.total_balance = Decimal('0')
         self.transactions = []
+
+    def start_page(self, balance):
+        if not self.page_count:
+            self.total_balance = balance  # Starting balance
+        self.check_balance(balance)
+        self.page_count += 1
+        self.active_page = True
+
+    def finish_page(self, balance=None):
+        self.check_balance(balance)
+        self.active_page = False
+
+    def add_transaction(self, transaction, balance=None):
+        self.transactions.append(transaction)
+        amount = transaction.amount
+        if transaction.tx_type == TransactionType.DEBIT:
+            amount *= -1
+        self.adjust_balance(amount)
+        self.check_balance(balance)
+
+    def adjust_balance(self, amount):
+        self.total_balance += amount
+
+    def check_balance(self, balance):
+        # Check that the total balance we've computed matches what's in the
+        # statement.
+        if balance is not None and balance != self.total_balance:
+            logger.warning(
+                'Balance mismatch: %s != %s', balance, self.total_balance
+            )
 
 
 class TransactionType(Enum):

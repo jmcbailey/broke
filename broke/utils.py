@@ -8,7 +8,11 @@ from decimal import Decimal
 def parse_amount(value):
     if value is None:
         return value
-    return Decimal(value.replace(',', ''))
+    sign = 1
+    if value.endswith(' OD'):
+        sign = -1
+        value = value[:-3]
+    return Decimal(value.replace(',', '')) * sign
 
 
 class DateParser:

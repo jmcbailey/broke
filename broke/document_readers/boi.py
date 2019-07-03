@@ -15,7 +15,6 @@ logger = logging.getLogger(__name__)
 
 '''
 TODO:
-- check balance as each tx processed
 - Save custom tag rules as JSON and apply (?)
 - Reuse description pattern
 - Count grouped transaction counts and amounts as each tx is read
@@ -46,8 +45,7 @@ class BOIStatementReader(PDFReader):
             )
         ),
         StatementLineType.BALANCE_FORWARD: Pattern(
-            r'^(?P<tx_date>%s) BALANCE FORWARD%s%s(?P<balance>%s)'
-            r'(?P<od> OD)?$' % (
+            r'^(?P<tx_date>%s) BALANCE FORWARD%s%s(?P<balance>%s(?: OD)?)$' % (
                 TX_DATE_REGEX_1, SEP, SEP, AMOUNT_REGEX
             ),
             processors={
@@ -57,7 +55,7 @@ class BOIStatementReader(PDFReader):
         ),
         StatementLineType.TRANSACTION: Pattern(
             r'^(?P<tx_date>%s )?(?P<desc>[\d\w*@.&/\-\'+ ]{1,30})%s'
-            r'(?P<amount>%s)%s(?P<balance>%s)?(?P<od> OD)?$' % (
+            r'(?P<amount>%s)%s(?P<balance>%s(?: OD)?)?$' % (
                 TX_DATE_REGEX_1, SEP, AMOUNT_REGEX, SEP, AMOUNT_REGEX
             ),
             processors={
@@ -126,33 +124,29 @@ class BOIStatementReader(PDFReader):
         values = [cell['text'] for cell in line]
         if not any(values):
             return
-        match = None
+        match = match_dict = None
         line_type = None
 
         for line_type, regex in self.statement_patterns.items():
             match = regex.match(SEP.join(values))
             if match:
-                logger.debug('MATCHED: %s: %s', line_type._name_, match)
+                match_dict = match.match_dict
                 break
         if not match:
-            logger.debug('UNMATCHED: %s', '|'.join(values))
             line_type = None
 
-        current_page = self.document.current_page
+        active_page = self.document.active_page
         if line_type == StatementLineType.BALANCE_FORWARD:
-            logger.debug('START PAGE')
-            self.document.start_page()
+            self.document.start_page(match_dict.get('balance'))
         elif line_type == StatementLineType.SUBTOTAL:
-            logger.debug('FINISH PAGE')
-            self.document.finish_page()
+            self.document.finish_page(match_dict.get('subtotal'))
         elif line_type == StatementLineType.END_STATEMENT:
-            logger.debug('END STATEMENT')
             self.document.finish_page()
         elif line_type == StatementLineType.TRANSACTION:
-            if not current_page:
+            if not active_page:
                 logger.warning('Found unexpected transaction: %s', match)
-            self.process_transaction(match.match_dict, line)
-        elif current_page and line_type != StatementLineType.TRANSACTION:
+            self.process_transaction(match_dict, line)
+        elif active_page and line_type != StatementLineType.TRANSACTION:
             self.unmatched_transactions.append('|'.join(values))
 
     def process_transaction(self, tx_dict, raw_line):
@@ -185,7 +179,7 @@ class BOIStatementReader(PDFReader):
             transaction.details = match_dict
             break
         logger.info('TX: %s', transaction)
-        self.document.current_page.transactions.append(transaction)
+        self.document.add_transaction(transaction, tx_dict.get('balance'))
 
     def resolve_date(self, dt):
         assert self.active_date
